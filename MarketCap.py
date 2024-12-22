@@ -1,12 +1,12 @@
 import yfinance as yf
 
 # Define the ticker symbol
-ticker = 'AAPL'
+ticker = 'XOM'
 
 # Get the ticker object
 stock = yf.Ticker(ticker)
 
 # Get basic information
-info = stock.info['marketCap']
+info = stock.info
 
 print(info)
