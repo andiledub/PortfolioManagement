@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-tickers=['AAPL','NVDA','MSFT','BRK-B','JPM','UNH','AVGO','MA','V','AXON','SW','DECK','MO','KMI','T','PLTR']
+tickers=['AAPL','NVDA','MSFT','BRK-B','JPM','UNH','AVGO','MA','V','AXON','SW','DECK','MO','KMI','T','WMT','COST','ABBV','PLTR','GLD']
 
 class DataPreprocessing:
     def __init__(self,tickers,start_date,end_date):
@@ -47,16 +47,10 @@ class DataPreprocessing:
         )
         return market_caps_df
 
-preprocessor = DataPreprocessing(tickers=['JNJ','JPM','ORCL','VLO','WMTI','SPX']
+preprocessor = DataPreprocessing(tickers=tickers
     , start_date='2021-01-30', end_date='2024-11-30')
-data = preprocessor.download_market_cap()
-print(data)
-#Clean data
-# cleaned_data = preprocessor.clean_data(data)
-#Calculate log returns
-#log_returns = preprocessor.calculate_log_returns(cleaned_data)
-
-
+rts = preprocessor.calculate_log_returns()
+print(rts)
 class FactorAnalysis:
     def __init__(self,log_returns):
         self.log_returns = log_returns
@@ -93,10 +87,9 @@ class FactorAnalysis:
                 "Quality": ["AVGO", "MA", "V"],
                 "Small Cap": ["AXON", "SW", "DECK"],
                 "Dividend": ["MO", "KMI", "T"],
-                "Commodity": ["DBC"],
-                "Bonds": ["SCHO", "TLT"],
-                "Momentum": ["MTUM"],
-                "VIX": ["^VIX"]
+                "Commodity": ["GLD"],
+                "Tech": ["PLTR"],
+                "Momentum": ['WMT','COST','ABBV'],
                 }
         
         #Flatten the asset list for all factors
@@ -147,46 +140,46 @@ class FactorAnalysis:
 # factor_analysis.factor_identification()
 # print(factor_analysis.reduce_correlation())
 
-# class FactorModeling:
-#     def __init__(self, log_returns, factors):
-#         self.log_returns = log_returns
-#         self.factors = factors
+class FactorModeling:
+    def __init__(self, log_returns, factors):
+        self.log_returns = log_returns
+        self.factors = factors
 
-#     def build_factor_model(self):
-#         # Implement factor modeling using regression analysis
-#         # Assume a linear regression model: log_returns = alpha + beta1*f1 + beta2*f2 + ... + betaN*fN + error
-#         # Where f1, f2, ..., fN are the identified factors
+    def build_factor_model(self):
+        # Implement factor modeling using regression analysis
+        # Assume a linear regression model: log_returns = alpha + beta1*f1 + beta2*f2 + ... + betaN*fN + error
+        # Where f1, f2, ..., fN are the identified factors
 
-#         # Perform regression analysis for each asset
-#         factors_matrix = np.column_stack(
-#             (np.ones(len(self.log_returns)), self.factors))  
-#         results = {}
+        # Perform regression analysis for each asset
+        factors_matrix = np.column_stack(
+            (np.ones(len(self.log_returns)), self.factors))  
+        results = {}
 
-#         for ticker in self.log_returns.columns:
-#             y = self.log_returns[ticker].values
-#             betas = np.linalg.lstsq(factors_matrix, y, rcond=None)[0]
-#             results[ticker] = betas[1:]  
+        for ticker in self.log_returns.columns:
+            y = self.log_returns[ticker].values
+            betas = np.linalg.lstsq(factors_matrix, y, rcond=None)[0]
+            results[ticker] = betas[1:]  
 
-#         return results
+        return results
 
-#     def validate_model(self):
-#         # Implement model validation using statistical tests or out-of-sample testing
+    def validate_model(self):
+        # Implement model validation using statistical tests or out-of-sample testing
 
-#         # Split data into training and testing sets
-#         train_data = self.log_returns.iloc[:int(0.8 * len(self.log_returns))]
-#         test_data = self.log_returns.iloc[int(0.8 * len(self.log_returns)):]
+        # Split data into training and testing sets
+        train_data = self.log_returns.iloc[:int(0.8 * len(self.log_returns))]
+        test_data = self.log_returns.iloc[int(0.8 * len(self.log_returns)):]
 
-#         # Train the factor model on training data
-#         train_factors = train_data[self.factors]
-#         train_model = self.build_factor_model().copy()
+        # Train the factor model on training data
+        train_factors = train_data[self.factors]
+        train_model = self.build_factor_model().copy()
 
-#         # Predict log returns on test data
-#         test_factors = test_data[self.factors]
-#         test_results = {}
+        # Predict log returns on test data
+        test_factors = test_data[self.factors]
+        test_results = {}
 
-#         for ticker in test_data.columns:
-#             predicted_returns = np.dot(np.column_stack(
-#                 (np.ones(len(test_factors)), test_factors), train_model[ticker]))
-#             test_results[ticker] = predicted_returns
+        for ticker in test_data.columns:
+            predicted_returns = np.dot(np.column_stack(
+                (np.ones(len(test_factors)), test_factors), train_model[ticker]))
+            test_results[ticker] = predicted_returns
 
-#         return test_results
+        return test_results
