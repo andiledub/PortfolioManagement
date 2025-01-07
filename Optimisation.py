@@ -10,32 +10,23 @@ plt.style.use('seaborn')
 mpl.rcParams['font.family'] = 'Sarif'
 
 class Optimisation:
-    def __init__(self,returns):
+    def __init__(self,returns,cov_matrix):
         self.returns_data = returns
         self.tickers = returns.columns
+        self.cov_matrix = cov_matrix
+        self.CONSTRAINTS = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
+        self.BOUNDARY = tuple((0,1) for x in range(len(self.tickers)))
+        self.INTIAL_GUESS = np.array(len(self.tickers)*[1./len(self.tickers),])
 
     def mean_variance_func(self, weights, lambda_risk=2):
-        """
-        Objective function for Markowitz mean-variance optimization.
-        
-        Parameters:
-        - weights: portfolio weights
-        - cov_matrix: covariance matrix of returns
-        - lambda_risk: risk aversion parameter (higher means more risk-averse)
-        
-        Returns:
-        - The negative of the objective function (to be minimized)
-        """
-        cov_matrix = self.returns_data.cov()*252
+
+        #cov_matrix = self.returns_data.cov()*252
         # Expected portfolio return (calculated using the portfolio_returns method)
         portfolio_return = self.portfolio_returns(weights)
-        
         # Portfolio variance (risk)
-        portfolio_variance = np.dot(weights.T, np.dot(cov_matrix, weights))
-        
+        portfolio_variance = np.dot(weights.T, np.dot(self.cov_matrix, weights))
         # Objective: Maximize return - lambda * risk
         objective = -(portfolio_return - lambda_risk * portfolio_variance)
-        
         return objective
 
     def plot_distribution_historgram(self):
@@ -46,7 +37,7 @@ class Optimisation:
         return np.sum(self.returns_data.mean()*weights)*252
     
     def portfolio_volatility(self,weights):
-        return np.sqrt(np.dot(weights.T, np.dot(self.returns_data.cov()*252,weights)))
+        return np.sqrt(np.dot(weights.T, np.dot(self.cov_matrix,weights)))
 
     def simulate_portfolios(self):
         NUMBER_OF_SIMULATIONS = 5000
@@ -83,35 +74,22 @@ class Optimisation:
         return np.sum(relative_diff ** 2)
 
     def risk_parity_optimisation(self):
-        INTIAL_GUESS = np.array(len(self.tickers)*[1./len(self.tickers),]) #Initial weights
-        cov_matrix = self.returns_data.cov()*252
-        CONSTRAINTS = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
-        BOUNDARY = [(0, 1) for _ in range(len(self.tickers))] # Bounds: weights between 0 and 1
         # Optimize weights
         result = sco.minimize(
-            self.risk_parity_func, INTIAL_GUESS, args=(cov_matrix), method='SLSQP',
-            bounds=BOUNDARY, constraints=CONSTRAINTS,
+            self.risk_parity_func, self.INTIAL_GUESS, args=(self.cov_matrix), method='SLSQP',
+            bounds=self.BOUNDARY, constraints=self.CONSTRAINTS,
             options={'maxiter': 1000, 'ftol': 1e-9}
         )
         return result
 
     def sharpe_optimisation(self):
-        CONSTRAINTS = ({'type':'eq', 'fun':lambda x: np.sum(x)-1})
-        BOUNDARY = tuple((0,1) for x in range(len(self.tickers)))
-        INTIAL_GUESS = np.array(len(self.tickers)*[1./len(self.tickers),])
-        return sco.minimize(self.max_sharpe_func,INTIAL_GUESS,method='SLSQP',constraints=CONSTRAINTS,bounds=BOUNDARY)
+        return sco.minimize(self.max_sharpe_func,self.INTIAL_GUESS,method='SLSQP',constraints=self.CONSTRAINTS,bounds=self.BOUNDARY)
     
     def variance_optimisation(self):
-        CONSTRAINTS = ({'type':'eq', 'fun':lambda x: np.sum(x)-1})
-        BOUNDARY = tuple((0,1) for x in range(len(self.tickers)))
-        INTIAL_GUESS = np.array(len(self.tickers)*[1./len(self.tickers),])#equal weights
-        return sco.minimize(self.portfolio_volatility,INTIAL_GUESS,method='SLSQP',bounds=BOUNDARY,constraints=CONSTRAINTS)
+        return sco.minimize(self.portfolio_volatility,self.INTIAL_GUESS,method='SLSQP',bounds=self.BOUNDARY,constraints=self.CONSTRAINTS)
 
     def markowitz_optimisation(self):
-        CONSTRAINTS = ({'type':'eq', 'fun':lambda x: np.sum(x)-1})
-        BOUNDARY = tuple((0,1) for x in range(len(self.tickers)))
-        INTIAL_GUESS = np.array(len(self.tickers)*[1./len(self.tickers),])
-        return sco.minimize(self.mean_variance_func,INTIAL_GUESS,method='SLSQP',constraints=CONSTRAINTS,bounds=BOUNDARY)
+        return sco.minimize(self.mean_variance_func,self.INTIAL_GUESS,method='SLSQP',constraints=self.CONSTRAINTS,bounds=self.BOUNDARY)
 
     def optimisation_summary(self):
         summary = {}
@@ -168,30 +146,30 @@ class Optimisation:
         plt.colorbar(label='Sharpe ratio')
         plt.show()
 
-    def equity_curve(self):
-        portfolio_returns = (
-            self.price_data
-            .pct_change()
-            .dropna()
-        )
-        eweights = np.array(len(self.tickers)*[1./len(self.tickers),])#equal weights
-        equally_weighted = portfolio_returns.apply(lambda row: np.dot(row, eweights), axis=1)
-        max_sharpe = portfolio_returns.apply(lambda row: np.dot(row, self.sharpe_optimisation().x), axis=1)
-        min_variance = portfolio_returns.apply(lambda row: np.dot(row, self.variance_optimisation().x), axis=1)
+    # def equity_curve(self):
+    #     portfolio_returns = (
+    #         self.price_data
+    #         .pct_change()
+    #         .dropna()
+    #     )
+    #     eweights = np.array(len(self.tickers)*[1./len(self.tickers),])#equal weights
+    #     equally_weighted = portfolio_returns.apply(lambda row: np.dot(row, eweights), axis=1)
+    #     max_sharpe = portfolio_returns.apply(lambda row: np.dot(row, self.sharpe_optimisation().x), axis=1)
+    #     min_variance = portfolio_returns.apply(lambda row: np.dot(row, self.variance_optimisation().x), axis=1)
 
-        # Calculate cumulative returns for both benchmark and portfolio
-        cumulative_portfolio_returns = (1 + max_sharpe).cumprod() - 1
-        cumulative_equalWeighted_returns = (1 + equally_weighted).cumprod() - 1
-        cumulative_minimumVariance_returns = (1 + min_variance).cumprod() - 1
+    #     # Calculate cumulative returns for both benchmark and portfolio
+    #     cumulative_portfolio_returns = (1 + max_sharpe).cumprod() - 1
+    #     cumulative_equalWeighted_returns = (1 + equally_weighted).cumprod() - 1
+    #     cumulative_minimumVariance_returns = (1 + min_variance).cumprod() - 1
 
-        # Plot the cumulative returns
-        plt.figure(figsize=(12, 6))
-        cumulative_portfolio_returns.plot(label='Optimized')
-        cumulative_equalWeighted_returns.plot(label='Equally Weighted')
-        cumulative_minimumVariance_returns.plot(label='Minimum Variance')
+    #     # Plot the cumulative returns
+    #     plt.figure(figsize=(12, 6))
+    #     cumulative_portfolio_returns.plot(label='Optimized')
+    #     cumulative_equalWeighted_returns.plot(label='Equally Weighted')
+    #     cumulative_minimumVariance_returns.plot(label='Minimum Variance')
 
-        plt.xlabel('Date')
-        plt.ylabel('Cumulative Returns')
-        plt.title('Cumulative Returns of Portfolio vs Benchmark')
-        plt.legend()
-        plt.show()
+    #     plt.xlabel('Date')
+    #     plt.ylabel('Cumulative Returns')
+    #     plt.title('Cumulative Returns of Portfolio vs Benchmark')
+    #     plt.legend()
+    #     plt.show()

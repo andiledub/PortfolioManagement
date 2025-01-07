@@ -1,4 +1,4 @@
-from DataPreprocessing import DataProcessing
+from MarketData import DataPreprocessing
 from BL import BlackLitterman
 import numpy as np
 import matplotlib.pyplot as plt
